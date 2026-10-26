@@ -95,6 +95,20 @@ function totalMetric(values: number[], days: number): MetricValue {
   return { value: sum(cur), previous: sum(previous(values, days)), spark: sparkline(cur) };
 }
 
+/**
+ * Total of several component series where each component is rounded to a whole
+ * number first, so a headline figure always equals the sum of the rows, bars or
+ * legend values shown beside it.
+ */
+function componentTotal(list: number[][], days: number): MetricValue {
+  const roundedSum = (pick: (values: number[]) => number[]) => sum(list.map((values) => Math.round(sum(pick(values)))));
+  return {
+    value: roundedSum((v) => current(v, days)),
+    previous: roundedSum((v) => previous(v, days)),
+    spark: sparkline(current(addSeries(list), days)),
+  };
+}
+
 function averageMetric(values: number[], days: number): MetricValue {
   const cur = current(values, days);
   return { value: mean(cur), previous: mean(previous(values, days)), spark: sparkline(cur) };
@@ -237,11 +251,11 @@ function adsTotals(s: ClientSeries, days: number, filter?: (index: number) => bo
   const conversions = addSeries(pick.map((c) => c.conversions));
   const value = addSeries(pick.map((c) => c.value));
   const roas = spend.map((sp, i) => (sp ? value[i]! / sp : 0));
-  const spendM = totalMetric(spend, days);
+  const spendM = componentTotal(pick.map((c) => c.spend), days);
   const valueM = totalMetric(value, days);
   return {
     spend: spendM,
-    conversions: totalMetric(conversions, days),
+    conversions: componentTotal(pick.map((c) => c.conversions), days),
     roas: {
       value: spendM.value ? valueM.value / spendM.value : 0,
       previous: spendM.previous ? valueM.previous / spendM.previous : 0,
@@ -265,9 +279,8 @@ const FIRST_NAMES = ["Avery", "Jordan", "Priya", "Marcus", "Elena", "Theo", "Nao
 const LAST_INITIALS = ["B.", "C.", "D.", "F.", "G.", "H.", "K.", "L.", "M.", "N.", "P.", "R.", "S.", "T.", "V.", "W."];
 const STATUSES: LeadRow["status"][] = ["New", "Contacted", "Qualified", "Booked"];
 
-function recentLeads(client: ClientProfile, s: ClientSeries, days: number, limit: number): { rows: LeadRow[]; total: number } {
+function recentLeads(client: ClientProfile, s: ClientSeries, days: number, limit: number, total: number): { rows: LeadRow[]; total: number } {
   const rows: LeadRow[] = [];
-  const total = Math.round(sum(current(s.leadsTotal, days)));
   for (let i = HISTORY_DAYS - 1; i >= HISTORY_DAYS - days && rows.length < limit; i -= 1) {
     const count = Math.round(s.leadsTotal[i]!);
     const rand = seeded("leads", client.id, i);
@@ -303,7 +316,7 @@ export function getOverview(clientId: string, range: RangeKey) {
   const { client, s } = seriesFor(clientId);
   const days = rangeDays(range);
   const ads = adsTotals(s, days);
-  const leads = totalMetric(s.leadsTotal, days);
+  const leads = componentTotal(LEAD_SOURCES.map(({ key }) => s.leads[key]), days);
 
   const reviewsCur = sum(current(s.gbpReviews, days));
   const reviewsPrev = sum(previous(s.gbpReviews, days));
@@ -325,7 +338,7 @@ export function getOverview(clientId: string, range: RangeKey) {
     client,
     days,
     traffic: {
-      sessions: totalMetric(s.sessions, days),
+      sessions: componentTotal(CHANNELS.map(({ key }) => s.channels[key]), days),
       users: totalMetric(s.users, days),
       byChannel: timeline(s.channels, days),
       channelTotals: CHANNELS.map(({ key, label, color }) => ({
@@ -370,7 +383,7 @@ export function getOverview(clientId: string, range: RangeKey) {
         ),
       },
       bySource: leadsBySource,
-      recent: recentLeads(client, s, days, 8),
+      recent: recentLeads(client, s, days, 8, leads.value),
     },
   };
 }
@@ -484,7 +497,7 @@ export function getAds(clientId: string, range: RangeKey) {
 
   const campaigns: CampaignRow[] = client.campaigns.map((c, index) => {
     const series = s.campaigns[index]!;
-    const spend = sum(current(series.spend, days));
+    const spend = Math.round(sum(current(series.spend, days)));
     const impressions = Math.round(sum(current(series.impressions, days)));
     const clicks = Math.round(sum(current(series.clicks, days)));
     const conversions = Math.round(sum(current(series.conversions, days)));
@@ -511,10 +524,10 @@ export function getAds(clientId: string, range: RangeKey) {
   const platformPacing = (["Google Ads", "Meta Ads"] as Platform[]).map((platform) => {
     const idx = client.campaigns.map((c, i) => (c.platform === platform ? i : -1)).filter((i) => i >= 0);
     const share = sum(idx.map((i) => client.campaigns[i]!.dailySpend)) / sum(client.campaigns.map((c) => c.dailySpend));
-    const spent = sum(idx.map((i) => sum(current(s.campaigns[i]!.spend, days))));
+    const spent = sum(idx.map((i) => Math.round(sum(current(s.campaigns[i]!.spend, days)))));
     // Budgets are planned per platform and do not always match delivery exactly.
     const plan = seededBetween(0.9, 1.16, client.id, "budget", platform);
-    return { platform, spent, budget: budgetForPeriod * share * plan };
+    return { platform, spent, budget: Math.round(budgetForPeriod * share * plan) };
   });
   const plannedBudget = sum(platformPacing.map((p) => p.budget));
 

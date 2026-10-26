@@ -143,10 +143,15 @@ async function main() {
     await t.page.locator("main").getByText("Summit Roofing").first().waitFor();
     const after = await kpis(t.page, ids);
     const same = changedAll(before, after);
-    assert(same.length === 0, `KPIs unchanged after client change: ${same.join(", ")}`);
     await t.page.getByLabel("Client").selectOption({ label: "Bloom Bakery" });
     const after2 = await kpis(t.page, ids);
-    assert(changedAll(after, after2).length === 0, "KPIs unchanged after switching to Bloom Bakery");
+    const same2 = changedAll(after, after2);
+    // Two clients can legitimately share one rounded figure; allow one coincidence per switch,
+    // but every KPI must change on at least one of the switches.
+    assert(same.length <= 1, `KPIs unchanged after switching to Summit Roofing: ${same.join(", ")}`);
+    assert(same2.length <= 1, `KPIs unchanged after switching to Bloom Bakery: ${same2.join(", ")}`);
+    const neverChanged = same.filter((id) => same2.includes(id));
+    assert(neverChanged.length === 0, `KPIs never changed with the client: ${neverChanged.join(", ")}`);
     t.assertClean();
     await t.close();
   });
@@ -219,6 +224,78 @@ async function main() {
     const byRoasAsc = await first();
     assert(initial !== byRoas || byRoas !== byRoasAsc, "Sorting by ROAS did not reorder rows");
     assert(await t.page.getByRole("progressbar", { name: "All platforms budget used" }).isVisible(), "Budget pacing bar missing");
+    t.assertClean();
+    await t.close();
+  });
+
+  const CLIENT_IDS = ["harbor-dental", "summit-roofing", "bloom-bakery"];
+  const RANGE_KEYS = ["7d", "30d", "90d"];
+  const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ""));
+
+  await test("ads: KPI cards, pacing and campaign totals agree for every client and range", async () => {
+    const t = await openPage();
+    await t.page.goto(url("/ads/"), { waitUntil: "networkidle" });
+    const table = t.page.getByRole("table", { name: "Campaign performance" });
+    for (const client of CLIENT_IDS) {
+      for (const range of RANGE_KEYS) {
+        await t.page.getByLabel("Client").selectOption(client);
+        await t.page.getByLabel("Date range").selectOption(range);
+        const label = `${client} ${range}`;
+        const k = await kpis(t.page, ["ads-spend", "ads-conversions", "ads-cpa", "ads-roas"]);
+        const foot = await table.locator("tfoot td").allInnerTexts();
+        const [spend, , , , , conv, cpa, roas] = foot;
+        assert(k["ads-spend"] === spend, `${label}: spend KPI ${k["ads-spend"]} != table total ${spend}`);
+        assert(k["ads-conversions"] === conv, `${label}: conversions KPI ${k["ads-conversions"]} != table total ${conv}`);
+        assert(k["ads-cpa"] === cpa, `${label}: CPA KPI ${k["ads-cpa"]} != table total ${cpa}`);
+        assert(k["ads-roas"] === roas, `${label}: ROAS KPI ${k["ads-roas"]} != table total ${roas}`);
+
+        const rowSpend = (await table.locator("tbody tr").evaluateAll((rows) => rows.map((r) => r.children[1]?.textContent ?? "")))
+          .reduce((total, v) => total + num(v), 0);
+        const rowConv = (await table.locator("tbody tr").evaluateAll((rows) => rows.map((r) => r.children[6]?.textContent ?? "")))
+          .reduce((total, v) => total + num(v), 0);
+        assert(rowSpend === num(spend), `${label}: campaign spend rows sum to ${rowSpend}, total shows ${spend}`);
+        assert(rowConv === num(conv), `${label}: campaign conversion rows sum to ${rowConv}, total shows ${conv}`);
+
+        const pacing = await t.page.locator("#pacing-title").locator("xpath=ancestor::section").locator("[data-pacing]").evaluateAll((els) =>
+          els.map((el) => ({ spent: el.getAttribute("data-spent"), budget: el.getAttribute("data-budget") })),
+        );
+        const [all, ...platforms] = pacing.map((p) => ({ spent: Number(p.spent), budget: Number(p.budget) }));
+        assert(all && platforms.length === 2, `${label}: pacing bars missing`);
+        const pSpent = platforms.reduce((x, p) => x + p.spent, 0);
+        const pBudget = platforms.reduce((x, p) => x + p.budget, 0);
+        assert(pSpent === all.spent, `${label}: platform spend ${pSpent} != all platforms ${all.spent}`);
+        assert(pBudget === all.budget, `${label}: platform budgets ${pBudget} != all platforms ${all.budget}`);
+        assert(all.spent === num(spend), `${label}: pacing spend ${all.spent} != spend KPI ${spend}`);
+      }
+    }
+    t.assertClean();
+    await t.close();
+  });
+
+  await test("overview: leads by source bars add up to the leads KPI and chart summary for every client and range", async () => {
+    const t = await openPage();
+    await t.page.goto(url("/"), { waitUntil: "networkidle" });
+    const figure = t.page.getByRole("figure", { name: "Horizontal bar chart of leads by source" });
+    for (const client of CLIENT_IDS) {
+      for (const range of RANGE_KEYS) {
+        await t.page.getByLabel("Client").selectOption(client);
+        await t.page.getByLabel("Date range").selectOption(range);
+        const label = `${client} ${range}`;
+        const leadsKpi = num(await kpi(t.page, "leads"));
+        const bars = (await figure.locator(".recharts-label-list text").allTextContents()).map(num);
+        assert(bars.length === 5, `${label}: expected 5 bar labels, got ${bars.length}`);
+        const barSum = bars.reduce((x, v) => x + v, 0);
+        const summary = await figure.locator("figcaption").innerText();
+        const summaryTotal = num(summary.match(/^([\d,]+) leads/)?.[1] ?? "NaN");
+        const [, topCount, topPct] = summary.match(/\(([\d,]+), (\d+)%\)/) ?? [];
+        assert(barSum === leadsKpi, `${label}: bars sum to ${barSum}, Leads KPI shows ${leadsKpi}`);
+        assert(summaryTotal === barSum, `${label}: summary says ${summaryTotal} leads, bars sum to ${barSum}`);
+        assert(num(topCount) === Math.max(...bars), `${label}: summary top source ${topCount} != largest bar ${Math.max(...bars)}`);
+        assert(Number(topPct) === Math.round((Math.max(...bars) / barSum) * 100), `${label}: summary share ${topPct}% is not consistent`);
+        const recent = await t.page.locator("#recent-leads-title").locator("xpath=..").innerText();
+        assert(new RegExp(`of ${leadsKpi.toLocaleString("en-US")} leads`).test(recent), `${label}: recent leads count does not match KPI`);
+      }
+    }
     t.assertClean();
     await t.close();
   });

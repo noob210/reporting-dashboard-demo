@@ -56,7 +56,7 @@ function PacingBar({ label, spent, budget, testId }: { label: string; spent: num
   const statusTone =
     status === "On pace" ? "text-emerald-800 bg-emerald-50 ring-emerald-200" : status === "Over-pacing" ? "text-rose-800 bg-rose-50 ring-rose-200" : "text-amber-900 bg-amber-50 ring-amber-200";
   return (
-    <div data-testid={testId}>
+    <div data-testid={testId} data-pacing data-spent={Math.round(spent)} data-budget={Math.round(budget)}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="text-sm font-medium text-slate-900">{label}</p>
         <p className="text-sm text-slate-600 tabular-nums">
