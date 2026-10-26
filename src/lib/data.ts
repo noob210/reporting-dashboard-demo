@@ -290,7 +290,7 @@ function recentLeads(client: ClientProfile, s: ClientSeries, days: number, limit
         source: source.label,
         service: client.services[Math.floor(rand() * client.services.length)]!,
         receivedAt: new Date(new Date(DATES[i]!).getTime() + minutes * 60_000).toISOString(),
-        status: age === 0 ? "New" : STATUSES[Math.min(STATUSES.length - 1, Math.floor(rand() * (age + 1)))]!,
+        status: age === 0 && rand() < 0.6 ? "New" : STATUSES[1 + Math.floor(rand() * (STATUSES.length - 1))]!,
         value: Math.round((client.monthlyBudget / 40) * (0.5 + rand())),
       });
     }
@@ -312,9 +312,10 @@ export function getOverview(clientId: string, range: RangeKey) {
   const rating = Math.min(5, client.gbp.rating + ratingShift(range));
   const ratingPrev = Math.min(5, client.gbp.rating + ratingShift(range) - seededBetween(-0.03, 0.06, client.id, "rating-prev", range));
 
-  const leadsBySource = LEAD_SOURCES.map(({ key, label, color }) => ({
+  const leadsBySource = LEAD_SOURCES.map(({ key, label, short, color }) => ({
     key,
     label,
+    short,
     color,
     value: Math.round(sum(current(s.leads[key], days))),
     previous: Math.round(sum(previous(s.leads[key], days))),
@@ -511,8 +512,11 @@ export function getAds(clientId: string, range: RangeKey) {
     const idx = client.campaigns.map((c, i) => (c.platform === platform ? i : -1)).filter((i) => i >= 0);
     const share = sum(idx.map((i) => client.campaigns[i]!.dailySpend)) / sum(client.campaigns.map((c) => c.dailySpend));
     const spent = sum(idx.map((i) => sum(current(s.campaigns[i]!.spend, days))));
-    return { platform, spent, budget: budgetForPeriod * share };
+    // Budgets are planned per platform and do not always match delivery exactly.
+    const plan = seededBetween(0.9, 1.16, client.id, "budget", platform);
+    return { platform, spent, budget: budgetForPeriod * share * plan };
   });
+  const plannedBudget = sum(platformPacing.map((p) => p.budget));
 
   const cpa = {
     value: totals.conversions.value ? totals.spend.value / totals.conversions.value : 0,
@@ -537,7 +541,7 @@ export function getAds(clientId: string, range: RangeKey) {
     campaigns,
     trend: timeline({ spend: totals.series.spend, conversions: totals.series.conversions }, days),
     pacing: {
-      budget: budgetForPeriod,
+      budget: plannedBudget,
       spent: totals.spend.value,
       platforms: platformPacing,
     },

@@ -263,10 +263,10 @@ export const CHANNELS: Array<{ key: ChannelKey; label: string; color: string }> 
   { key: "social", label: "Organic social", color: "#e11d48" },
 ];
 
-export const LEAD_SOURCES: Array<{ key: LeadSourceKey; label: string; color: string }> = [
-  { key: "organic", label: "Organic search", color: "#4f46e5" },
-  { key: "googleAds", label: "Google Ads", color: "#0ea5e9" },
-  { key: "metaAds", label: "Meta Ads", color: "#8b5cf6" },
-  { key: "gbp", label: "Google Business Profile", color: "#14b8a6" },
-  { key: "referral", label: "Referral", color: "#f59e0b" },
+export const LEAD_SOURCES: Array<{ key: LeadSourceKey; label: string; short: string; color: string }> = [
+  { key: "organic", short: "Organic search", label: "Organic search", color: "#4f46e5" },
+  { key: "googleAds", short: "Google Ads", label: "Google Ads", color: "#0ea5e9" },
+  { key: "metaAds", short: "Meta Ads", label: "Meta Ads", color: "#8b5cf6" },
+  { key: "gbp", short: "Business Profile", label: "Google Business Profile", color: "#14b8a6" },
+  { key: "referral", short: "Referral", label: "Referral", color: "#f59e0b" },
 ];
