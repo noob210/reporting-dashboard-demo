@@ -8,7 +8,7 @@ import { ChartTooltip, axisProps, gridProps, periodLabel } from "./chart-theme";
 export function TrafficChart({ data, days }: { data: Array<Record<ChannelKey, number> & { date: string }>; days: number }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
+      <AreaChart accessibilityLayer={false} data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
         <defs>
           {CHANNELS.map((c) => (
             <linearGradient key={c.key} id={`traffic-${c.key}`} x1="0" x2="0" y1="0" y2="1">

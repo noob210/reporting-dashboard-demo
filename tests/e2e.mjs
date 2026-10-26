@@ -300,6 +300,119 @@ async function main() {
     await t.close();
   });
 
+  const expectedPacing = (percent) => (percent > 100 ? "Over budget" : percent < 90 ? "Under-pacing" : "On pace");
+
+  await test("ads: budget pacing labels follow the 90% / 100% thresholds for every client and range", async () => {
+    const t = await openPage();
+    await t.page.goto(url("/ads/"), { waitUntil: "networkidle" });
+    let overBudgetSeen = 0;
+    for (const client of CLIENT_IDS) {
+      for (const range of RANGE_KEYS) {
+        await t.page.getByLabel("Client").selectOption(client);
+        await t.page.getByLabel("Date range").selectOption(range);
+        const rows = await t.page.locator("[data-pacing]").evaluateAll((els) =>
+          els.map((el) => {
+            const spans = el.querySelectorAll(":scope > div:last-child > span");
+            return { used: spans[0]?.textContent ?? "", status: spans[1]?.textContent ?? "" };
+          }),
+        );
+        assert(rows.length === 3, `${client} ${range}: expected 3 pacing rows`);
+        for (const row of rows) {
+          const percent = num(row.used);
+          const label = `${client} ${range} (${row.used})`;
+          assert(!(percent > 100 && row.status === "On pace"), `${label}: over 100% labelled On pace`);
+          assert(row.status === expectedPacing(percent), `${label}: expected "${expectedPacing(percent)}", got "${row.status}"`);
+          if (row.status === "Over budget") overBudgetSeen += 1;
+        }
+      }
+    }
+    assert(overBudgetSeen > 0, "Sample data never exercised the Over budget state");
+    t.assertClean();
+    await t.close();
+  });
+
+  await test("absolute-unit deltas (avg. position, rating) never show a % sign, including zero", async () => {
+    const t = await openPage();
+    const checks = [
+      { path: "/", ids: ["avg-position", "gbp-rating"] },
+      { path: "/seo/", ids: ["seo-position"] },
+    ];
+    let zeroSeen = 0;
+    for (const { path, ids } of checks) {
+      await t.page.goto(url(path), { waitUntil: "networkidle" });
+      for (const client of CLIENT_IDS) {
+        for (const range of RANGE_KEYS) {
+          await t.page.getByLabel("Client").selectOption(client);
+          await t.page.getByLabel("Date range").selectOption(range);
+          for (const id of ids) {
+            const full = (await t.page.locator(`[data-kpi="${id}"] [data-delta]`).innerText()).trim();
+            assert(!full.includes("%"), `${path} ${client} ${range} ${id}: delta "${full}" contains %`);
+            // Visible value only; the screen reader suffix "(Up, improvement)" follows it.
+            const badge = full.split(/\s*\(/)[0].trim();
+            assert(!badge.includes("%"), `${path} ${client} ${range} ${id}: delta "${badge}" contains %`);
+            assert(/^(?:[+−]?\d+\.\d)$/.test(badge), `${path} ${client} ${range} ${id}: unexpected delta format "${badge}"`);
+            if (badge === "0.0") zeroSeen += 1;
+          }
+        }
+      }
+    }
+    assert(zeroSeen > 0, "No zero delta case was exercised");
+    t.assertClean();
+    await t.close();
+  });
+
+  for (const { path } of PAGES) {
+    await test(`charts on ${path} have no unnamed application roles or focusable svgs`, async () => {
+      const t = await openPage();
+      await t.page.goto(url(path), { waitUntil: "networkidle" });
+      for (const client of CLIENT_IDS) {
+        for (const range of RANGE_KEYS) {
+          await t.page.getByLabel("Client").selectOption(client);
+          await t.page.getByLabel("Date range").selectOption(range);
+          const issues = await t.page.evaluate(() => {
+            const named = (el) =>
+              !!(el.getAttribute("aria-label")?.trim() || (el.getAttribute("aria-labelledby") && document.getElementById(el.getAttribute("aria-labelledby"))?.textContent?.trim()) || el.querySelector(":scope > title")?.textContent?.trim());
+            const out = [];
+            for (const el of document.querySelectorAll('[role="application"]')) if (!named(el)) out.push(`unnamed role=application <${el.tagName.toLowerCase()} class="${el.getAttribute("class")}">`);
+            for (const el of document.querySelectorAll("svg")) {
+              const ti = el.getAttribute("tabindex");
+              if (ti !== null && Number(ti) >= 0 && !named(el)) out.push(`unnamed focusable svg class="${el.getAttribute("class")}"`);
+            }
+            for (const el of document.querySelectorAll(".recharts-wrapper, .recharts-surface")) {
+              const ti = el.getAttribute("tabindex");
+              if (ti !== null && Number(ti) >= 0 && !named(el)) out.push(`unnamed tab stop on ${el.getAttribute("class")}`);
+            }
+            return out;
+          });
+          assert(issues.length === 0, `${client} ${range}: ${issues.join("; ")}`);
+          const figures = await t.page.locator("figure[aria-label]").count();
+          const captions = await t.page.locator("figure[aria-label] figcaption").count();
+          assert(figures > 0 && figures === captions, `${client} ${range}: chart figures lost their label or text summary`);
+        }
+      }
+      t.assertClean();
+      await t.close();
+    });
+  }
+
+  await test("table sort-header buttons are at least 24x24px at 390px on every page", async () => {
+    const t = await openPage({ width: 390, height: 844 });
+    for (const { path } of PAGES) {
+      await t.page.goto(url(path), { waitUntil: "networkidle" });
+      const sizes = await t.page.locator("th button").evaluateAll((els) =>
+        els.map((el) => {
+          const r = el.getBoundingClientRect();
+          return { name: el.textContent?.trim(), w: r.width, h: r.height };
+        }),
+      );
+      assert(sizes.length > 0, `${path}: no sort buttons found`);
+      const small = sizes.filter((s) => s.h < 24 || s.w < 24);
+      assert(small.length === 0, `${path}: undersized sort buttons ${JSON.stringify(small)}`);
+    }
+    t.assertClean();
+    await t.close();
+  });
+
   await test("export button shows a toast and does not error", async () => {
     const t = await openPage();
     await t.page.goto(url("/"), { waitUntil: "networkidle" });

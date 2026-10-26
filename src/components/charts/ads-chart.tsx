@@ -7,7 +7,7 @@ import { ChartTooltip, axisProps, gridProps, periodLabel } from "./chart-theme";
 export function SpendConversionsChart({ data, days }: { data: Array<{ date: string; spend: number; conversions: number }>; days: number }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: -4 }}>
+      <ComposedChart accessibilityLayer={false} data={data} margin={{ top: 4, right: 0, bottom: 0, left: -4 }}>
         <CartesianGrid {...gridProps} />
         <XAxis dataKey="date" {...axisProps} tickFormatter={(v) => fmt.date(String(v))} minTickGap={24} />
         <YAxis yAxisId="spend" {...axisProps} tickFormatter={(v) => fmt.usdCompact(Number(v))} width={48} />
