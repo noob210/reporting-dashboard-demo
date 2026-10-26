@@ -7,7 +7,7 @@ import { ChartTooltip, axisProps, gridProps, periodLabel } from "./chart-theme";
 export function ClicksImpressionsChart({ data, days }: { data: Array<{ date: string; clicks: number; impressions: number }>; days: number }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: -8 }}>
+      <ComposedChart accessibilityLayer={false} data={data} margin={{ top: 4, right: 0, bottom: 0, left: -8 }}>
         <defs>
           <linearGradient id="impressions-fill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#a5b4fc" stopOpacity={0.45} />
@@ -29,7 +29,7 @@ export function ClicksImpressionsChart({ data, days }: { data: Array<{ date: str
 export function PositionDistributionChart({ data }: { data: Array<{ label: string; keywords: number }> }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -12 }} barCategoryGap="22%">
+      <BarChart accessibilityLayer={false} data={data} margin={{ top: 4, right: 4, bottom: 0, left: -12 }} barCategoryGap="22%">
         <CartesianGrid {...gridProps} />
         <XAxis dataKey="label" {...axisProps} />
         <YAxis {...axisProps} allowDecimals={false} width={44} />

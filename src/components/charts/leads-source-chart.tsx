@@ -15,7 +15,7 @@ function CategoryTick({ x, y, payload }: { x?: number | string; y?: number | str
 export function LeadsSourceChart({ data }: { data: Array<{ label: string; short: string; value: number; color: string }> }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 36, bottom: 0, left: 0 }} barCategoryGap={10}>
+      <BarChart accessibilityLayer={false} data={data} layout="vertical" margin={{ top: 0, right: 36, bottom: 0, left: 0 }} barCategoryGap={10}>
         <CartesianGrid {...gridProps} vertical horizontal={false} />
         <XAxis type="number" {...axisProps} tickFormatter={(v) => fmt.int(Number(v))} allowDecimals={false} />
         <YAxis type="category" dataKey="short" {...axisProps} width={112} tick={<CategoryTick />} />

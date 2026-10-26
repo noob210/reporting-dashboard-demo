@@ -187,7 +187,7 @@ export function OverviewView() {
                 current: gbp.rating.value,
                 previous: gbp.rating.previous,
                 mode: "absolute",
-                formatAbsolute: (n) => fmt.dec2(n),
+                formatAbsolute: (n) => fmt.dec1(n),
                 comparisonLabel: vs,
               }}
               footnote={

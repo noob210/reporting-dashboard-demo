@@ -13,7 +13,7 @@ export const GBP_SERIES = [
 export function GbpChart({ data, days }: { data: Array<{ date: string; views: number; calls: number; directions: number }>; days: number }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: -8 }}>
+      <LineChart accessibilityLayer={false} data={data} margin={{ top: 4, right: 0, bottom: 0, left: -8 }}>
         <CartesianGrid {...gridProps} />
         <XAxis dataKey="date" {...axisProps} tickFormatter={(v) => fmt.date(String(v))} minTickGap={24} />
         <YAxis yAxisId="views" {...axisProps} tickFormatter={(v) => fmt.compact(Number(v))} width={44} />

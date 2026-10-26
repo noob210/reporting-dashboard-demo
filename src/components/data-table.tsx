@@ -85,7 +85,7 @@ export function DataTable<T>({
                     <button
                       type="button"
                       onClick={() => toggle(column)}
-                      className={`inline-flex items-center gap-1 rounded-md px-1 py-0.5 -mx-1 hover:bg-slate-200/60 hover:text-slate-900 ${column.align === "right" ? "flex-row-reverse" : ""} ${active ? "text-slate-900" : ""}`}
+                      className={`inline-flex min-h-6 min-w-6 items-center gap-1 rounded-md px-1 py-1 -mx-1 hover:bg-slate-200/60 hover:text-slate-900 ${column.align === "right" ? "flex-row-reverse" : ""} ${active ? "text-slate-900" : ""}`}
                     >
                       <span>{column.header}</span>
                       {active ? (

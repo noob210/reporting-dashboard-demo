@@ -49,14 +49,30 @@ const campaignColumns: Column<CampaignRow>[] = [
 const PLATFORM_FILTERS = ["All", "Google Ads", "Meta Ads"] as const;
 type PlatformFilter = (typeof PLATFORM_FILTERS)[number];
 
+type PacingStatus = "Under-pacing" | "On pace" | "Over budget";
+
+/** Under 90% is under-pacing, 90–100% is on pace, over 100% is over budget. */
+function pacingStatus(percent: number): PacingStatus {
+  if (percent > 100) return "Over budget";
+  if (percent < 90) return "Under-pacing";
+  return "On pace";
+}
+
 function PacingBar({ label, spent, budget, testId }: { label: string; spent: number; budget: number; testId?: string }) {
   const ratio = budget ? spent / budget : 0;
-  const status = ratio > 1.05 ? "Over-pacing" : ratio < 0.9 ? "Under-pacing" : "On pace";
-  const tone = status === "On pace" ? "bg-indigo-600" : status === "Over-pacing" ? "bg-rose-600" : "bg-amber-500";
+  // The reporting period is complete, so anything above 100% has overspent the plan.
+  // Thresholds use the rounded percentage that is displayed next to the label.
+  const percent = Math.round(ratio * 100);
+  const status = pacingStatus(percent);
+  const tone = status === "On pace" ? "bg-indigo-600" : status === "Over budget" ? "bg-rose-600" : "bg-amber-500";
   const statusTone =
-    status === "On pace" ? "text-emerald-800 bg-emerald-50 ring-emerald-200" : status === "Over-pacing" ? "text-rose-800 bg-rose-50 ring-rose-200" : "text-amber-900 bg-amber-50 ring-amber-200";
+    status === "On pace"
+      ? "text-emerald-800 bg-emerald-50 ring-emerald-200"
+      : status === "Over budget"
+        ? "text-rose-800 bg-rose-50 ring-rose-200"
+        : "text-amber-900 bg-amber-50 ring-amber-200";
   return (
-    <div data-testid={testId}>
+    <div data-testid={testId} data-pacing data-spent={Math.round(spent)} data-budget={Math.round(budget)} data-percent={percent} data-status={status}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="text-sm font-medium text-slate-900">{label}</p>
         <p className="text-sm text-slate-600 tabular-nums">
@@ -69,13 +85,13 @@ function PacingBar({ label, spent, budget, testId }: { label: string; spent: num
         aria-label={`${label} budget used`}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={Math.round(ratio * 100)}
-        aria-valuetext={`${fmt.pct0(ratio)} of budget used, ${status.toLowerCase()}`}
+        aria-valuenow={percent}
+        aria-valuetext={`${percent}% of budget used, ${status.toLowerCase()}`}
       >
         <div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.min(100, ratio * 100)}%` }} />
       </div>
       <div className="mt-1.5 flex items-center justify-between text-xs">
-        <span className="text-slate-600 tabular-nums">{fmt.pct0(ratio)} used</span>
+        <span className="text-slate-600 tabular-nums">{percent}% used</span>
         <span className={`rounded-full px-2 py-0.5 font-medium ring-1 ring-inset ${statusTone}`}>{status}</span>
       </div>
     </div>

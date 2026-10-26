@@ -22,14 +22,14 @@ export function DeltaBadge({
   const diff = current - previous;
   const ratio = previous === 0 ? 0 : diff / Math.abs(previous);
   const magnitude = mode === "percent" ? Math.abs(ratio) : Math.abs(diff);
-  const flat = mode === "percent" ? magnitude < 0.0005 : magnitude < 0.05;
+  const format = (n: number) => (mode === "percent" ? `${(n * 100).toFixed(1)}%` : formatAbsolute(n));
+  const zeroText = format(0);
+  // Treat anything that rounds to zero in this metric's own unit as no change.
+  const flat = format(magnitude) === zeroText;
   const up = diff > 0;
   const good = flat ? null : invert ? !up : up;
 
-  const text =
-    mode === "percent"
-      ? `${(magnitude * 100).toFixed(1)}%`
-      : formatAbsolute(magnitude);
+  const text = format(magnitude);
   const directionWord = flat ? "No change" : up ? "Up" : "Down";
   const Icon = flat ? ArrowRight : up ? ArrowUpRight : ArrowDownRight;
 
@@ -42,10 +42,10 @@ export function DeltaBadge({
 
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
-      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold tabular-nums ring-1 ring-inset ${tone}`}>
+      <span data-delta className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold tabular-nums ring-1 ring-inset ${tone}`}>
         <Icon className="size-3.5" aria-hidden="true" strokeWidth={2.5} />
         <span>
-          {flat ? "0.0%" : `${up ? "+" : "−"}${text}`}
+          {flat ? zeroText : `${up ? "+" : "−"}${text}`}
         </span>
         <span className="sr-only">
           {` (${directionWord}${good === null ? "" : good ? ", improvement" : ", decline"})`}
