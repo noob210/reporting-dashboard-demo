@@ -1,2 +1,5 @@
-import Link from "next/link";
-export default function Page() { return <main><h1>Overview</h1><Link href="/seo/">SEO</Link></main>; }
+import { OverviewView } from "@/views/overview-view";
+
+export default function OverviewPage() {
+  return <OverviewView />;
+}
